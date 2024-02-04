@@ -1,0 +1,9 @@
+# cargo
+/target
+
+# vim
+*.swp
+
+# ctags
+/tags
+/src/tags
