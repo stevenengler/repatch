@@ -2,5 +2,21 @@
 name = "repatch"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/stevenengler/repatch"
+description = "A regex find-and-replace tool with a `git add --patch`-like interface."
+keywords = ["search", "find", "replace", "regex", "patch"]
+categories = ["command-line-utilities", "text processing", "filesystem"]
 
 [dependencies]
+anstyle = "1.0.4"
+anyhow = "1.0.79"
+bstr = { version = "1.9.0", features = ["unicode"] }
+clap = { version = "4.4.16", features = ["derive", "wrap_help"] }
+diffy = "0.3.0"
+grep-matcher = "0.1.7"
+grep-regex = "0.1.12"
+grep-searcher = "0.1.13"
+ignore = "0.4.22"
+libc = "0.2.152"
+tempfile = "3.9.0"
