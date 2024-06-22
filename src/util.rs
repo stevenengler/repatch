@@ -48,6 +48,16 @@ pub fn replace_file<T>(
     modified_at: Option<SystemTime>,
     f: impl FnOnce(&File, &File) -> (bool, T),
 ) -> Result<T, ReplaceFileError> {
+    replace_file_linux(path, modified_at, /* allow_fallback= */ true, f)
+}
+
+/// A linux-specific variant of [`replace_file`].
+fn replace_file_linux<T>(
+    path: impl AsRef<Path>,
+    modified_at: Option<SystemTime>,
+    allow_fallback: bool,
+    f: impl FnOnce(&File, &File) -> (bool, T),
+) -> Result<T, ReplaceFileError> {
     let path = path.as_ref();
 
     if !path.is_file() {
@@ -64,8 +74,6 @@ pub fn replace_file<T>(
 
     let tmp_c_path = CString::new(tmp_path.as_os_str().as_bytes()).unwrap();
 
-    let original = File::open(path)?;
-
     // for paths like "foo", rust will return a parent of "" which is not useful for syscalls so we
     // replace it with "./"
     let mut parent_path = path.parent().unwrap();
@@ -74,11 +82,21 @@ pub fn replace_file<T>(
     }
 
     // create an unnamed file on the mount for the path
-    let new = OpenOptions::new()
+    let new = match OpenOptions::new()
         .write(true)
         .truncate(true)
         .custom_flags(libc::O_TMPFILE)
-        .open(parent_path)?;
+        .open(parent_path)
+    {
+        Ok(x) => x,
+        // O_TMPFILE is only supported on a few filesystems
+        Err(e) if allow_fallback && e.raw_os_error() == Some(libc::EOPNOTSUPP) => {
+            return replace_file_compat(path, modified_at, f);
+        }
+        Err(e) => return Err(e.into()),
+    };
+
+    let original = File::open(path)?;
 
     // copy only the user/group/other read/write/execute permission bits
     let mask = libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO;
@@ -129,6 +147,68 @@ pub fn replace_file<T>(
 
     // replace the original file at `path` with the new file
     std::fs::rename(&tmp_path, path)?;
+
+    Ok(rv)
+}
+
+/// A platform-agnostic variant of [`replace_file`].
+fn replace_file_compat<T>(
+    path: impl AsRef<Path>,
+    modified_at: Option<SystemTime>,
+    f: impl FnOnce(&File, &File) -> (bool, T),
+) -> Result<T, ReplaceFileError> {
+    let path = path.as_ref();
+
+    if !path.is_file() {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "not a file").into());
+    }
+
+    // copy only the user/group/other read/write/execute permission bits
+    let mask = libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO;
+
+    let original = File::open(path)?;
+    let original_permissions = read_permissions(&original, mask)?;
+
+    let mut prefix = OsString::new();
+    prefix.push(".");
+    prefix.push(path.file_name().unwrap());
+    prefix.push(".");
+
+    let mut new = tempfile::Builder::new();
+    let new = new
+        .prefix(&prefix)
+        .suffix(".tmp")
+        // even though we set the permissions below, we should also set them here to avoid
+        // temporarily creating a file that's more permissive than the original
+        .permissions(original_permissions.clone())
+        // create it in the same directory since you can't rename a file across filesystems
+        .tempfile_in(path.parent().unwrap())?;
+
+    // set the permissions after creating the file so that it's not affected by the umask
+    new.as_file().set_permissions(original_permissions)?;
+
+    // TODO: use fallocate() to ensure we have approx enough space (the new file might be larger or
+    // smaller than the original, but will typically be similar)?
+
+    let (do_replace_file, rv) = f(&original, new.as_file());
+
+    // the user-provided closure asked us to stop
+    if !do_replace_file {
+        return Ok(rv);
+    };
+
+    if let Some(modified_at) = modified_at {
+        // the current "modified" time for the file
+        let latest_modified = std::fs::metadata(path)?.modified()?;
+
+        // return an error if the file's "modified" timestamps differ
+        if latest_modified != modified_at {
+            return Err(ReplaceFileError::ModifiedTimeChanged);
+        }
+    }
+
+    // replace the original file at `path` with the new file
+    new.persist(path).map_err(|e| e.error)?;
 
     Ok(rv)
 }
@@ -510,5 +590,28 @@ mod tests {
     #[test]
     fn test_replace_file() {
         replace_file_tester!(replace_file);
+    }
+
+    #[test]
+    fn test_replace_file_compat() {
+        replace_file_tester!(replace_file_compat);
+    }
+
+    // 'replace_file_linux' only works on certain filesystems, so ignore by default
+    #[test]
+    #[ignore]
+    #[cfg(target_os = "linux")]
+    fn test_replace_file_linux() {
+        // test it without falling back to the platform-agnostic version, otherwise we might miss
+        // valid errors in the linux implementation
+        pub fn helper<T>(
+            path: impl AsRef<Path>,
+            modified_at: Option<SystemTime>,
+            f: impl FnOnce(&File, &File) -> (bool, T),
+        ) -> Result<T, ReplaceFileError> {
+            replace_file_linux(path, modified_at, /* allow_fallback= */ false, f)
+        }
+
+        replace_file_tester!(helper);
     }
 }
