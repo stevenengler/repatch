@@ -433,11 +433,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "linux")]
-    fn test_user_edit_linux() {
+    fn test_user_edit() {
         // tee should clear the file and write nothing, so the "hello world" is effectively removed
         assert_eq!(
-            user_edit_linux(b"hello world", ["tee"]).ok(),
+            user_edit(b"hello world", ["tee"]).ok(),
             Some(Some(b"".to_vec()))
         );
     }
@@ -447,6 +446,16 @@ mod tests {
         // tee should clear the file and write nothing, so the "hello world" is effectively removed
         assert_eq!(
             user_edit_compat(b"hello world", ["tee"]).ok(),
+            Some(Some(b"".to_vec()))
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_user_edit_linux() {
+        // tee should clear the file and write nothing, so the "hello world" is effectively removed
+        assert_eq!(
+            user_edit_linux(b"hello world", ["tee"]).ok(),
             Some(Some(b"".to_vec()))
         );
     }
