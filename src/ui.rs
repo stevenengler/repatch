@@ -1,4 +1,4 @@
-use std::ffi::{CStr, OsStr};
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{BufRead, Read, Seek, Write};
 use std::os::fd::{AsRawFd, FromRawFd};
@@ -25,13 +25,8 @@ fn user_edit(
 ) -> std::io::Result<Option<Vec<u8>>> {
     let mut editor_cmd = editor_cmd.into_iter();
 
-    // TODO: replace with C string literals in rust 1.77
-    fn as_cstr(null_terminated_bytes: &[u8]) -> &CStr {
-        CStr::from_bytes_with_nul(null_terminated_bytes).unwrap()
-    }
-
     // create a memfd file
-    let edit_file = unsafe { libc::memfd_create(as_cstr(b"edit\0").as_ptr(), libc::MFD_CLOEXEC) };
+    let edit_file = unsafe { libc::memfd_create(c"edit".as_ptr(), libc::MFD_CLOEXEC) };
     assert!(edit_file >= 0);
     let mut edit_file = unsafe { File::from_raw_fd(edit_file) };
 
