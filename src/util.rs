@@ -168,7 +168,7 @@ fn read_permissions(file: &File, mask: u32) -> std::io::Result<std::fs::Permissi
     Ok(std::fs::Permissions::from_mode(mode))
 }
 
-pub fn editor_cmd() -> impl Iterator<Item = impl AsRef<OsStr>> {
+pub fn editor_cmd() -> impl Iterator<Item = impl AsRef<OsStr>> + Clone {
     static EDITOR_CMD: OnceLock<Vec<OsString>> = OnceLock::new();
 
     // this is roughly what `sudo -e` does when parsing env variables

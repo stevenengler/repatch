@@ -21,6 +21,22 @@ pub const COUNT_STYLE: anstyle::Style = anstyle::Style::new().bold();
 /// error code (for example `:cq` in vim).
 fn user_edit(
     text: &[u8],
+    editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>> + Clone,
+) -> std::io::Result<Option<Vec<u8>>> {
+    let mut rv = user_edit_linux(text, editor_cmd.clone());
+
+    // if the linux-specific version failed with ENOTSUP, then try again with a more-compatible
+    // version
+    if rv.as_ref().err().map(|e| e.kind()) == Some(std::io::ErrorKind::Unsupported) {
+        rv = user_edit_compat(text, editor_cmd);
+    }
+
+    rv
+}
+
+/// A linux-specific variant of [`user_edit`].
+fn user_edit_linux(
+    text: &[u8],
     editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>>,
 ) -> std::io::Result<Option<Vec<u8>>> {
     let mut editor_cmd = editor_cmd.into_iter();
@@ -38,6 +54,7 @@ fn user_edit(
     let mut cmd = Command::new(editor_cmd.next().expect("editor_cmd was empty"));
     cmd.args(editor_cmd);
     cmd.arg(format!("/proc/self/fd/{edit_fd}"));
+    cmd.stdin(std::process::Stdio::null());
 
     // remove the CLOEXEC flag after the fork
     unsafe {
@@ -51,6 +68,39 @@ fn user_edit(
         });
     }
 
+    if !cmd.status()?.success() {
+        return Ok(None);
+    }
+
+    // seek to the beginning of the file
+    edit_file.rewind()?;
+
+    // read the modified file
+    let mut buf = Vec::new();
+    edit_file.read_to_end(&mut buf)?;
+
+    Ok(Some(buf))
+}
+
+/// A platform-agnostic variant of [`user_edit`].
+fn user_edit_compat(
+    text: &[u8],
+    editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>>,
+) -> std::io::Result<Option<Vec<u8>>> {
+    let mut editor_cmd = editor_cmd.into_iter();
+
+    let edit_file = tempfile::Builder::new().tempfile()?;
+    let edit_path = edit_file.path();
+    let mut edit_file = edit_file.as_file();
+
+    // write the text to the file
+    edit_file.write_all(text)?;
+
+    // allow the user to modify the text
+    let mut cmd = Command::new(editor_cmd.next().expect("editor_cmd was empty"));
+    cmd.args(editor_cmd);
+    cmd.arg(edit_path.as_os_str());
+    cmd.stdin(std::process::Stdio::null());
     if !cmd.status()?.success() {
         return Ok(None);
     }
@@ -380,5 +430,24 @@ mod tests {
             // test round-trip
             assert_eq!(as_str.parse(), Ok(option));
         }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_user_edit_linux() {
+        // tee should clear the file and write nothing, so the "hello world" is effectively removed
+        assert_eq!(
+            user_edit_linux(b"hello world", ["tee"]).ok(),
+            Some(Some(b"".to_vec()))
+        );
+    }
+
+    #[test]
+    fn test_user_edit_compat() {
+        // tee should clear the file and write nothing, so the "hello world" is effectively removed
+        assert_eq!(
+            user_edit_compat(b"hello world", ["tee"]).ok(),
+            Some(Some(b"".to_vec()))
+        );
     }
 }
