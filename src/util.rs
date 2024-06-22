@@ -402,7 +402,7 @@ pub(crate) use label;
 mod tests {
     use super::*;
 
-    use std::io::{Read, Write};
+    use std::io::Write;
 
     #[test]
     fn test_ranges() {
@@ -441,9 +441,7 @@ mod tests {
 
             $f(file.path(), None, |mut original, mut new| {
                 new.write_all(b"foo ").unwrap();
-                let mut buf = Vec::new();
-                original.read_to_end(&mut buf).unwrap();
-                new.write_all(&buf).unwrap();
+                std::io::copy(&mut original, &mut new).unwrap();
                 (true, ())
             })
             .unwrap();
@@ -452,7 +450,7 @@ mod tests {
             // leave the file open
             let file = file.into_temp_path();
 
-            // verify the nre file has the correct contents
+            // verify the new file has the correct contents
             assert_eq!(std::fs::read(&file).unwrap(), b"foo hello world\n");
 
             /////////
@@ -462,9 +460,7 @@ mod tests {
 
             $f(file.path(), None, |mut original, mut new| {
                 new.write_all(b"foo ").unwrap();
-                let mut buf = Vec::new();
-                original.read_to_end(&mut buf).unwrap();
-                new.write_all(&buf).unwrap();
+                std::io::copy(&mut original, &mut new).unwrap();
                 (false, ())
             })
             .unwrap();
@@ -491,9 +487,7 @@ mod tests {
 
             $f(file.path(), None, |mut original, mut new| {
                 new.write_all(b"foo ").unwrap();
-                let mut buf = Vec::new();
-                original.read_to_end(&mut buf).unwrap();
-                new.write_all(&buf).unwrap();
+                std::io::copy(&mut original, &mut new).unwrap();
                 (true, ())
             })
             .unwrap();
@@ -502,7 +496,7 @@ mod tests {
             // leave the file open
             let file = file.into_temp_path();
 
-            // verify the nre file has the correct contents
+            // verify the new file has the correct contents
             assert_eq!(std::fs::read(&file).unwrap(), b"foo hello world\n");
 
             // verify the new file has the same permissions
