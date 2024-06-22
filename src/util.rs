@@ -433,81 +433,88 @@ mod tests {
         assert_eq!(ranges(&list, padding), [0..=3, 4..=8, 99..=101]);
     }
 
+    // it would be nice to make this helper a generic fn, but it's not possible without HRTBs
+    macro_rules! replace_file_tester {
+        ($f: ident) => {{
+            let mut file = tempfile::Builder::new().tempfile().unwrap();
+            file.write_all(b"hello world\n").unwrap();
+
+            $f(file.path(), None, |mut original, mut new| {
+                new.write_all(b"foo ").unwrap();
+                let mut buf = Vec::new();
+                original.read_to_end(&mut buf).unwrap();
+                new.write_all(&buf).unwrap();
+                (true, ())
+            })
+            .unwrap();
+
+            // `file` doesn't point to the new file located at `file.path()`, so it's confusing to
+            // leave the file open
+            let file = file.into_temp_path();
+
+            // verify the nre file has the correct contents
+            assert_eq!(std::fs::read(&file).unwrap(), b"foo hello world\n");
+
+            /////////
+
+            let mut file = tempfile::Builder::new().tempfile().unwrap();
+            file.write_all(b"hello world\n").unwrap();
+
+            $f(file.path(), None, |mut original, mut new| {
+                new.write_all(b"foo ").unwrap();
+                let mut buf = Vec::new();
+                original.read_to_end(&mut buf).unwrap();
+                new.write_all(&buf).unwrap();
+                (false, ())
+            })
+            .unwrap();
+
+            // verify the file has the same contents
+            assert_eq!(std::fs::read(file.path()).unwrap(), b"hello world\n");
+
+            /////////
+
+            let mut file = tempfile::Builder::new().tempfile().unwrap();
+            file.write_all(b"hello world\n").unwrap();
+
+            // user readable and executable
+            let target_permissions = std::fs::Permissions::from_mode(libc::S_IXUSR | libc::S_IRUSR);
+
+            // set the permissions for the file
+            file.as_file()
+                .set_permissions(target_permissions.clone())
+                .unwrap();
+            assert_eq!(
+                read_permissions(&file.as_file(), u32::MAX).unwrap(),
+                target_permissions,
+            );
+
+            $f(file.path(), None, |mut original, mut new| {
+                new.write_all(b"foo ").unwrap();
+                let mut buf = Vec::new();
+                original.read_to_end(&mut buf).unwrap();
+                new.write_all(&buf).unwrap();
+                (true, ())
+            })
+            .unwrap();
+
+            // `file` doesn't point to the new file located at `file.path()`, so it's confusing to
+            // leave the file open
+            let file = file.into_temp_path();
+
+            // verify the nre file has the correct contents
+            assert_eq!(std::fs::read(&file).unwrap(), b"foo hello world\n");
+
+            // verify the new file has the same permissions
+            assert_eq!(
+                read_permissions(&File::open(&file).unwrap(), u32::MAX).unwrap(),
+                target_permissions,
+            );
+        }};
+    }
+
     #[test]
     fn test_replace_file() {
-        let mut file = tempfile::Builder::new().tempfile().unwrap();
-        file.write_all(b"hello world\n").unwrap();
-
-        replace_file(file.path(), None, |mut original, mut new| {
-            new.write_all(b"foo ").unwrap();
-            let mut buf = Vec::new();
-            original.read_to_end(&mut buf).unwrap();
-            new.write_all(&buf).unwrap();
-            (true, ())
-        })
-        .unwrap();
-
-        // `file` doesn't point to the new file located at `file.path()`, so it's confusing to leave
-        // the file open
-        let file = file.into_temp_path();
-
-        // verify the nre file has the correct contents
-        assert_eq!(std::fs::read(&file).unwrap(), b"foo hello world\n");
-
-        /////////
-
-        let mut file = tempfile::Builder::new().tempfile().unwrap();
-        file.write_all(b"hello world\n").unwrap();
-
-        replace_file(file.path(), None, |mut original, mut new| {
-            new.write_all(b"foo ").unwrap();
-            let mut buf = Vec::new();
-            original.read_to_end(&mut buf).unwrap();
-            new.write_all(&buf).unwrap();
-            (false, ())
-        })
-        .unwrap();
-
-        // verify the file has the same contents
-        assert_eq!(std::fs::read(file.path()).unwrap(), b"hello world\n");
-
-        /////////
-
-        let mut file = tempfile::Builder::new().tempfile().unwrap();
-        file.write_all(b"hello world\n").unwrap();
-
-        // user readable and executable
-        let target_permissions = std::fs::Permissions::from_mode(libc::S_IXUSR | libc::S_IRUSR);
-
-        // set the permissions for the file
-        file.as_file()
-            .set_permissions(target_permissions.clone())
-            .unwrap();
-        assert_eq!(
-            read_permissions(&file.as_file(), u32::MAX).unwrap(),
-            target_permissions,
-        );
-
-        replace_file(file.path(), None, |mut original, mut new| {
-            new.write_all(b"foo ").unwrap();
-            let mut buf = Vec::new();
-            original.read_to_end(&mut buf).unwrap();
-            new.write_all(&buf).unwrap();
-            (true, ())
-        })
-        .unwrap();
-
-        // `file` doesn't point to the new file located at `file.path()`, so it's confusing to leave
-        // the file open
-        let file = file.into_temp_path();
-
-        // verify the nre file has the correct contents
-        assert_eq!(std::fs::read(&file).unwrap(), b"foo hello world\n");
-
-        // verify the new file has the same permissions
-        assert_eq!(
-            read_permissions(&File::open(&file).unwrap(), u32::MAX).unwrap(),
-            target_permissions,
-        );
+        replace_file_tester!(replace_file);
     }
 }
