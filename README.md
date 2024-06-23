@@ -4,12 +4,12 @@
 
 re:patch is a line-oriented find-and-replace tool with a [`git add
 --patch`][git-add-patch]-like interface. Regular expressions and capture groups
-are supported, and re:patch can be used with files and directories. Only Linux
-is currently supported.
+are supported, and re:patch can be used with files and directories. Linux and
+MacOS are currently supported (MacOS on a reasonable-efforts basis).
 
-> [!WARNING]
+> [!WARNING]  
 > This tool is still in development. While it Works For Me™, it does not yet
-> have any tests. It's recommended to only use this in directories that are
+> have many tests. It's recommended to only use this in directories that are
 > version controlled.
 
 [crates.io]: https://crates.io/crates/repatch
@@ -21,13 +21,13 @@ is currently supported.
 You can install from source or through crates.io. You must have a recent
 [rust/cargo][rust] toolchain installed.
 
-```
+```bash
 # install the latest release from crates.io
 cargo install repatch
 
-# install from source
+# install the latest development version
 git clone https://github.com/stevenengler/repatch.git
-cd repatch && cargo install --path .
+cargo install --path repatch
 ```
 
 [rust]: https://www.rust-lang.org/tools/install
