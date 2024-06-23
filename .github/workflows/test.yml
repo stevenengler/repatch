@@ -14,6 +14,9 @@ on:
   pull_request:
     types: [opened, synchronize]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   linux:
     runs-on: ubuntu-latest
