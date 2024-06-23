@@ -22,15 +22,7 @@ fn user_edit(
 ) -> std::io::Result<Option<Vec<u8>>> {
     #[cfg(target_os = "linux")]
     {
-        let mut rv = user_edit_linux(text, editor_cmd.clone());
-
-        // if the linux-specific version failed with ENOTSUP, then try again with a
-        // more-compatible version
-        if rv.as_ref().err().map(|e| e.kind()) == Some(std::io::ErrorKind::Unsupported) {
-            rv = user_edit_compat(text, editor_cmd);
-        }
-
-        rv
+        user_edit_linux(text, editor_cmd)
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -93,6 +85,7 @@ fn user_edit_linux(
 }
 
 /// A platform-agnostic variant of [`user_edit`].
+#[cfg(any(test, not(target_os = "linux")))]
 fn user_edit_compat(
     text: &[u8],
     editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>>,
