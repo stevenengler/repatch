@@ -1,9 +1,8 @@
-use std::ffi::{CString, OsStr, OsString};
-use std::fs::{File, OpenOptions};
+use std::ffi::{OsStr, OsString};
+use std::fs::File;
 use std::io::Write;
-use std::os::fd::AsRawFd;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 use std::sync::OnceLock;
@@ -48,16 +47,30 @@ pub fn replace_file<T>(
     modified_at: Option<SystemTime>,
     f: impl FnOnce(&File, &File) -> (bool, T),
 ) -> Result<T, ReplaceFileError> {
-    replace_file_linux(path, modified_at, /* allow_fallback= */ true, f)
+    #[cfg(target_os = "linux")]
+    {
+        replace_file_linux(path, modified_at, /* allow_fallback= */ true, f)
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        replace_file_compat(path, modified_at, f)
+    }
 }
 
 /// A linux-specific variant of [`replace_file`].
+#[cfg(target_os = "linux")]
 fn replace_file_linux<T>(
     path: impl AsRef<Path>,
     modified_at: Option<SystemTime>,
     allow_fallback: bool,
     f: impl FnOnce(&File, &File) -> (bool, T),
 ) -> Result<T, ReplaceFileError> {
+    use std::ffi::CString;
+    use std::fs::OpenOptions;
+    use std::os::fd::AsRawFd;
+    use std::os::unix::fs::OpenOptionsExt;
+
     let path = path.as_ref();
 
     if !path.is_file() {
@@ -99,7 +112,8 @@ fn replace_file_linux<T>(
     let original = File::open(path)?;
 
     // copy only the user/group/other read/write/execute permission bits
-    let mask = libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO;
+    #[allow(clippy::useless_conversion)]
+    let mask = u32::from(libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO);
 
     // set the permissions after creating the file so that it's not affected by the umask
     new.set_permissions(read_permissions(&original, mask)?)?;
@@ -164,7 +178,8 @@ fn replace_file_compat<T>(
     }
 
     // copy only the user/group/other read/write/execute permission bits
-    let mask = libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO;
+    #[allow(clippy::useless_conversion)]
+    let mask = u32::from(libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO);
 
     let original = File::open(path)?;
     let original_permissions = read_permissions(&original, mask)?;
@@ -243,7 +258,10 @@ impl std::error::Error for ReplaceFileError {}
 fn read_permissions(file: &File, mask: u32) -> std::io::Result<std::fs::Permissions> {
     // `std::fs::Metadata::permissions()` contains everything in the `st_mode` stat field, which
     // also contains the file type which we mask out
-    let mode = file.metadata()?.permissions().mode() & !libc::S_IFMT;
+    #[allow(clippy::useless_conversion)]
+    let file_type_mask = u32::from(libc::S_IFMT);
+
+    let mode = file.metadata()?.permissions().mode() & !file_type_mask;
     let mode = mode & mask;
     Ok(std::fs::Permissions::from_mode(mode))
 }
@@ -554,7 +572,9 @@ mod tests {
             file.write_all(b"hello world\n").unwrap();
 
             // user readable and executable
-            let target_permissions = std::fs::Permissions::from_mode(libc::S_IXUSR | libc::S_IRUSR);
+            #[allow(clippy::useless_conversion)]
+            let target_permissions = u32::from(libc::S_IXUSR | libc::S_IRUSR);
+            let target_permissions = std::fs::Permissions::from_mode(target_permissions);
 
             // set the permissions for the file
             file.as_file()

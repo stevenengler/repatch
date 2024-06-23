@@ -1,8 +1,5 @@
 use std::ffi::OsStr;
-use std::fs::File;
 use std::io::{BufRead, Read, Seek, Write};
-use std::os::fd::{AsRawFd, FromRawFd};
-use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::Command;
 
@@ -23,22 +20,35 @@ fn user_edit(
     text: &[u8],
     editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>> + Clone,
 ) -> std::io::Result<Option<Vec<u8>>> {
-    let mut rv = user_edit_linux(text, editor_cmd.clone());
+    #[cfg(target_os = "linux")]
+    {
+        let mut rv = user_edit_linux(text, editor_cmd.clone());
 
-    // if the linux-specific version failed with ENOTSUP, then try again with a more-compatible
-    // version
-    if rv.as_ref().err().map(|e| e.kind()) == Some(std::io::ErrorKind::Unsupported) {
-        rv = user_edit_compat(text, editor_cmd);
+        // if the linux-specific version failed with ENOTSUP, then try again with a
+        // more-compatible version
+        if rv.as_ref().err().map(|e| e.kind()) == Some(std::io::ErrorKind::Unsupported) {
+            rv = user_edit_compat(text, editor_cmd);
+        }
+
+        rv
     }
 
-    rv
+    #[cfg(not(target_os = "linux"))]
+    {
+        user_edit_compat(text, editor_cmd)
+    }
 }
 
 /// A linux-specific variant of [`user_edit`].
+#[cfg(target_os = "linux")]
 fn user_edit_linux(
     text: &[u8],
     editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>>,
 ) -> std::io::Result<Option<Vec<u8>>> {
+    use std::fs::File;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::process::CommandExt;
+
     let mut editor_cmd = editor_cmd.into_iter();
 
     // create a memfd file
