@@ -1,0 +1,80 @@
+# Syntax reference:
+# https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions
+
+name: Test
+permissions: read-all
+
+defaults:
+  run:
+    shell: bash
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  testing:
+    runs-on: ubuntu-latest
+
+    container:
+      image: ${{ matrix.container }}
+
+    strategy:
+      matrix:
+        # this CI testing can't test the different kernel versions that these distributions use,
+        # but this is better than nothing
+        container: ['ubuntu:24.04', 'debian:12-slim', 'fedora:40']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install dependencies
+        env:
+          CONTAINER: ${{ matrix.container }}
+        run: |
+          case "$CONTAINER" in
+            ubuntu*|debian* )
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y curl clang
+              ;;
+            fedora* )
+              dnf install -y util-linux curl clang
+              ;;
+            * )
+              echo "Container $CONTAINER not handled"
+              exit 1
+              ;;
+          esac
+
+      - name: Add user
+        run: |
+          useradd --create-home user
+          chown -R user:user .
+
+      - name: Container info
+        shell: su --shell /bin/bash user -- -eo pipefail {0}
+        run: |
+          pwd
+          id -u
+
+      - name: Install rust
+        shell: su --shell /bin/bash user -- -eo pipefail {0}
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile=minimal
+
+      - name: Build
+        shell: su --shell /bin/bash user -- -eo pipefail {0}
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build
+
+      - name: Test
+        shell: su --shell /bin/bash user -- -eo pipefail {0}
+        run: |
+          . "$HOME/.cargo/env"
+          RUST_BACKTRACE=1 cargo test
