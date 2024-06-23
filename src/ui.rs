@@ -249,9 +249,9 @@ pub fn patch_prompt(
             MenuOption::Quit => PatchOption::Quit,
             MenuOption::Edit => label!('edit_prompt: {
                 const INVALID_PATCH_PROMPT: &str =
-                    "Your patch is invalid. Edit again (saying \"no\" discards!) [y/n]?";
+                    r#"Your patch is invalid. Edit again (saying "no" discards!) [y/n]?"#;
                 const DOES_NOT_APPLY_PROMPT: &str =
-                    "Your edited hunk does not apply. Edit again (saying \"no\" discards!) [y/n]?";
+                    r#"Your edited hunk does not apply. Edit again (saying "no" discards!) [y/n]?"#;
 
                 let edited = 'edit_hunk: {
                     let editor_cmd = crate::util::editor_cmd();

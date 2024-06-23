@@ -245,7 +245,7 @@ impl std::fmt::Display for ReplaceFileError {
         match self {
             Self::Io(e) => write!(f, "{e}"),
             Self::ModifiedTimeChanged => {
-                write!(f, "the file's \"modified\" timestamp unexpectedly changed")
+                write!(f, r#"the file's "modified" timestamp unexpectedly changed"#)
             }
         }
     }
