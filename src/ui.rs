@@ -56,7 +56,6 @@ fn user_edit_linux(
     let mut cmd = Command::new(editor_cmd.next().expect("editor_cmd was empty"));
     cmd.args(editor_cmd);
     cmd.arg(format!("/proc/self/fd/{edit_fd}"));
-    cmd.stdin(std::process::Stdio::null());
 
     // remove the CLOEXEC flag after the fork
     unsafe {
@@ -103,7 +102,6 @@ fn user_edit_compat(
     let mut cmd = Command::new(editor_cmd.next().expect("editor_cmd was empty"));
     cmd.args(editor_cmd);
     cmd.arg(edit_path.as_os_str());
-    cmd.stdin(std::process::Stdio::null());
     if !cmd.status()?.success() {
         return Ok(None);
     }
@@ -437,29 +435,29 @@ mod tests {
 
     #[test]
     fn test_user_edit() {
-        // tee should clear the file and write nothing, so the "hello world" is effectively removed
+        let cmd = ["sh", "-c", "printf foobar > $1", "rust-test"];
         assert_eq!(
-            user_edit(b"hello world", ["tee"]).ok(),
-            Some(Some(b"".to_vec()))
+            user_edit(b"hello world", cmd).ok(),
+            Some(Some(b"foobar".to_vec()))
         );
     }
 
     #[test]
     fn test_user_edit_compat() {
-        // tee should clear the file and write nothing, so the "hello world" is effectively removed
+        let cmd = ["sh", "-c", "printf foobar > $1", "rust-test"];
         assert_eq!(
-            user_edit_compat(b"hello world", ["tee"]).ok(),
-            Some(Some(b"".to_vec()))
+            user_edit_compat(b"hello world", cmd).ok(),
+            Some(Some(b"foobar".to_vec()))
         );
     }
 
     #[test]
     #[cfg(target_os = "linux")]
     fn test_user_edit_linux() {
-        // tee should clear the file and write nothing, so the "hello world" is effectively removed
+        let cmd = ["sh", "-c", "printf foobar > $1", "rust-test"];
         assert_eq!(
-            user_edit_linux(b"hello world", ["tee"]).ok(),
-            Some(Some(b"".to_vec()))
+            user_edit_linux(b"hello world", cmd).ok(),
+            Some(Some(b"foobar".to_vec()))
         );
     }
 }
