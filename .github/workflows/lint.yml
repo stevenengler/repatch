@@ -1,0 +1,41 @@
+# Syntax reference:
+# https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions
+
+name: Lint
+permissions: read-all
+
+defaults:
+  run:
+    shell: bash
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  testing:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Clippy
+        run: |
+          cargo clippy -- -Dwarnings
+
+      - name: Docs
+        run: |
+          RUSTDOCFLAGS='-D warnings' cargo doc
+
+      - name: Lockfile
+        run: |
+          cargo update --locked --workspace
+
+      - name: Rust
+        run: |
+          cargo fmt -- --check
