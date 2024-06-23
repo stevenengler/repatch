@@ -15,7 +15,7 @@ on:
     types: [opened, synchronize]
 
 jobs:
-  testing:
+  linux:
     runs-on: ubuntu-latest
 
     container:
@@ -77,4 +77,23 @@ jobs:
         shell: su --shell /bin/bash user -- -eo pipefail {0}
         run: |
           . "$HOME/.cargo/env"
+          RUST_BACKTRACE=1 cargo test
+
+  macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build
+        shell: bash -eo pipefail {0}
+        run: |
+          cargo build
+
+      - name: Test
+        shell: bash -eo pipefail {0}
+        run: |
           RUST_BACKTRACE=1 cargo test
