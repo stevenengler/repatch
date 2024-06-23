@@ -5,7 +5,7 @@
 re:patch is a line-oriented find-and-replace tool with a [`git add
 --patch`][git-add-patch]-like interface. Regular expressions and capture groups
 are supported, and re:patch can be used with files and directories. Linux and
-MacOS are currently supported (MacOS on a reasonable-efforts basis).
+macOS are currently supported (macOS on a reasonable-efforts basis).
 
 > [!WARNING]  
 > This tool is still in development. While it Works For Me™, it does not yet
