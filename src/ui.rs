@@ -19,7 +19,7 @@ pub const COUNT_STYLE: anstyle::Style = anstyle::Style::new().bold();
 fn user_edit(
     text: &[u8],
     editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>> + Clone,
-) -> std::io::Result<Option<Vec<u8>>> {
+) -> Result<Option<Vec<u8>>, UserEditError> {
     #[cfg(target_os = "linux")]
     {
         user_edit_linux(text, editor_cmd)
@@ -36,7 +36,7 @@ fn user_edit(
 fn user_edit_linux(
     text: &[u8],
     editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>>,
-) -> std::io::Result<Option<Vec<u8>>> {
+) -> Result<Option<Vec<u8>>, UserEditError> {
     use std::fs::File;
     use std::os::fd::{AsRawFd, FromRawFd};
     use std::os::unix::process::CommandExt;
@@ -69,8 +69,16 @@ fn user_edit_linux(
         });
     }
 
-    if !cmd.status()?.success() {
-        return Ok(None);
+    match cmd.status() {
+        Ok(status) => {
+            if !status.success() {
+                return Ok(None);
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(UserEditError::EditorNotFound);
+        }
+        Err(e) => return Err(e.into()),
     }
 
     // seek to the beginning of the file
@@ -88,7 +96,7 @@ fn user_edit_linux(
 fn user_edit_compat(
     text: &[u8],
     editor_cmd: impl IntoIterator<Item = impl AsRef<OsStr>>,
-) -> std::io::Result<Option<Vec<u8>>> {
+) -> Result<Option<Vec<u8>>, UserEditError> {
     let mut editor_cmd = editor_cmd.into_iter();
 
     let edit_file = tempfile::Builder::new().tempfile()?;
@@ -102,8 +110,17 @@ fn user_edit_compat(
     let mut cmd = Command::new(editor_cmd.next().expect("editor_cmd was empty"));
     cmd.args(editor_cmd);
     cmd.arg(edit_path.as_os_str());
-    if !cmd.status()?.success() {
-        return Ok(None);
+
+    match cmd.status() {
+        Ok(status) => {
+            if !status.success() {
+                return Ok(None);
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(UserEditError::EditorNotFound);
+        }
+        Err(e) => return Err(e.into()),
     }
 
     // seek to the beginning of the file
@@ -115,6 +132,29 @@ fn user_edit_compat(
 
     Ok(Some(buf))
 }
+
+#[derive(Debug)]
+pub enum UserEditError {
+    Io(std::io::Error),
+    EditorNotFound,
+}
+
+impl From<std::io::Error> for UserEditError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl std::fmt::Display for UserEditError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "{e}"),
+            Self::EditorNotFound => write!(f, "the editor command was not found"),
+        }
+    }
+}
+
+impl std::error::Error for UserEditError {}
 
 fn menu_prompt(
     patch: &diffy::Patch<[u8]>,
@@ -255,10 +295,23 @@ pub fn patch_prompt(
                     let editor_cmd = crate::util::editor_cmd();
 
                     // allow the user to edit the patch
-                    let Some(patch) = user_edit(&patch.to_bytes(), editor_cmd).unwrap() else {
-                        // the editor didn't exit successfully
-                        error!("The editor did not exit successfully.");
-                        continue 'patch_prompt;
+                    let patch = match user_edit(&patch.to_bytes(), editor_cmd.clone()) {
+                        Ok(Some(x)) => x,
+                        Ok(None) => {
+                            // the editor didn't exit successfully
+                            error!("The editor did not exit successfully.");
+                            continue 'patch_prompt;
+                        }
+                        Err(UserEditError::EditorNotFound) => {
+                            let mut editor_cmd = editor_cmd;
+                            let editor = editor_cmd.next().unwrap().as_ref().to_owned();
+                            error!("The editor {editor:?} was not found.");
+                            continue 'patch_prompt;
+                        }
+                        Err(e) => {
+                            error!("Patch editing failed: {e}.");
+                            continue 'patch_prompt;
+                        }
                     };
 
                     // if not valid utf-8, then it must not be empty
