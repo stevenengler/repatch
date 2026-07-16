@@ -31,7 +31,7 @@ jobs:
       matrix:
         # this CI testing can't test the different kernel versions that these distributions use,
         # but this is better than nothing
-        container: ['ubuntu:24.04', 'debian:12-slim', 'fedora:40']
+        container: ['ubuntu:26.04', 'debian:13-slim', 'fedora:44']
 
     steps:
       - name: Checkout
