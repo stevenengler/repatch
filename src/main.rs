@@ -7,7 +7,7 @@ mod util;
 
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
@@ -166,6 +166,12 @@ fn find_matches(
                 let path = entry.path();
                 let meta = match std::fs::metadata(path) {
                     Ok(x) => x,
+                    // there's a race here where the file could be replaced between the `metadata()`
+                    // and `is_symlink()` calls, but that's fine
+                    Err(e) if e.kind() == ErrorKind::NotFound && path.is_symlink() => {
+                        // ignore errors when a symlink points to a non-existent file
+                        continue;
+                    }
                     Err(e) => {
                         error!("{}: {e}", path.display());
                         num_errors += 1;
