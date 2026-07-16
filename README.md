@@ -26,8 +26,7 @@ You can install from source or through crates.io. You must have a recent
 cargo install repatch
 
 # install the latest development version
-git clone https://github.com/stevenengler/repatch.git
-cargo install --path repatch
+cargo install --git https://github.com/stevenengler/repatch.git
 ```
 
 [rust]: https://www.rust-lang.org/tools/install
