@@ -306,17 +306,16 @@ pub fn editor_cmd() -> impl Iterator<Item = impl AsRef<OsStr>> + Clone {
             .arg("--null")
             .arg("core.editor")
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let mut output = output.stdout;
-                // the last byte should be a nul
-                assert!(matches!(output.pop(), Some(0) | None));
+            let mut output = output.stdout;
+            // the last byte should be a nul
+            assert!(matches!(output.pop(), Some(0) | None));
 
-                if !output.is_empty() {
-                    let cmd = split_whitespace(&output);
-                    if !cmd.is_empty() {
-                        return cmd;
-                    }
+            if !output.is_empty() {
+                let cmd = split_whitespace(&output);
+                if !cmd.is_empty() {
+                    return cmd;
                 }
             }
         }
