@@ -116,14 +116,14 @@ fn run(args: Args) -> anyhow::Result<()> {
                 Ok(x) => x,
                 Err(ReplaceFileError::Io(e)) => {
                     return Err(e)
-                        .with_context(|| format!("could not replace file '{}'", path.display()))
+                        .with_context(|| format!("could not replace file '{}'", path.display()));
                 }
                 Err(ReplaceFileError::ModifiedTimeChanged) => {
                     return Err(anyhow::anyhow!(
                         "the file '{}' was modified by another program\n\
                         Discarding all patches to this file and exiting.",
                         path.display(),
-                    ))
+                    ));
                 }
             };
 
