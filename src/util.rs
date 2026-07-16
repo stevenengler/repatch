@@ -348,7 +348,7 @@ pub fn replace_regex(
     })
 }
 
-pub fn rewrite_patch_line_counts(bytes: &[u8]) -> std::borrow::Cow<[u8]> {
+pub fn rewrite_patch_line_counts(bytes: &[u8]) -> std::borrow::Cow<'_, [u8]> {
     let result = (|| {
         let mut lines = crate::parse::lines_with_pos(bytes);
 
