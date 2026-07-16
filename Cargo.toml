@@ -6,7 +6,7 @@ license = "MIT"
 repository = "https://github.com/stevenengler/repatch"
 description = "A regex find-and-replace tool with a `git add --patch`-like interface."
 keywords = ["search", "find", "replace", "regex", "patch"]
-categories = ["command-line-utilities", "text processing", "filesystem"]
+categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
 anstyle = "1.0.14"
