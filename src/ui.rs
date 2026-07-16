@@ -424,11 +424,18 @@ impl std::str::FromStr for MenuOption {
 }
 
 macro_rules! style {
-    ($str:expr, $style:expr) => {{
-        // for type checking
-        let _style: &anstyle::Style = $style;
-        format_args!("{}{}{}", $style, $str, anstyle::Reset)
-    }};
+    ($str:expr, $style:expr) => {
+        format_args!(
+            "{}{}{}",
+            {
+                // for type checking
+                let _style: &anstyle::Style = $style;
+                $style
+            },
+            $str,
+            &anstyle::Reset,
+        )
+    };
 }
 pub(crate) use style;
 

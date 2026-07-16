@@ -16,12 +16,12 @@ use anyhow::Context as anyhowContext;
 use bstr::ByteSlice;
 use clap::Parser;
 use grep_regex::{RegexMatcher, RegexMatcherBuilder};
-use grep_searcher::sinks::Bytes;
 use grep_searcher::Searcher;
+use grep_searcher::sinks::Bytes;
 use ignore::WalkBuilder;
 
 use crate::cli::{Args, Context};
-use crate::ui::{error, style, MenuOption, PatchOption, COUNT_STYLE};
+use crate::ui::{COUNT_STYLE, MenuOption, PatchOption, error, style};
 use crate::util::ReplaceFileError;
 
 fn main() -> ExitCode {

@@ -1,7 +1,7 @@
 [package]
 name = "repatch"
 version = "0.1.1"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/stevenengler/repatch"
 description = "A regex find-and-replace tool with a `git add --patch`-like interface."
